@@ -111,6 +111,9 @@ CREATE TABLE transfers (
 SELECT * FROM transfers;
 ```
 
+### Test Memcached in Docker
+
+
 ## Training Workflow
 
 * Each session introduces new concepts

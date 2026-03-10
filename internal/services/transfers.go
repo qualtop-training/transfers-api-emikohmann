@@ -7,6 +7,7 @@ import (
 	"transfers-api/internal/config"
 	"transfers-api/internal/enums"
 	"transfers-api/internal/known_errors"
+	"transfers-api/internal/logging"
 	"transfers-api/internal/models"
 )
 
@@ -20,14 +21,16 @@ type TransfersRepository interface {
 }
 
 type TransfersService struct {
-	businessCfg   config.BusinessConfig
-	transfersRepo TransfersRepository
+	businessCfg    config.BusinessConfig
+	transfersRepo  TransfersRepository
+	transfersCache TransfersRepository
 }
 
-func NewTransfersService(businessCfg config.BusinessConfig, transfersRepo TransfersRepository) *TransfersService {
+func NewTransfersService(businessCfg config.BusinessConfig, transfersRepo TransfersRepository, transfersCache TransfersRepository) *TransfersService {
 	return &TransfersService{
-		businessCfg:   businessCfg,
-		transfersRepo: transfersRepo,
+		businessCfg:    businessCfg,
+		transfersRepo:  transfersRepo,
+		transfersCache: transfersCache,
 	}
 }
 
@@ -51,14 +54,32 @@ func (s *TransfersService) Create(ctx context.Context, transfer models.Transfer)
 	if err != nil {
 		return "", fmt.Errorf("error creating transfer in repository: %w", err)
 	}
+	transfer.ID = id
+	if _, err := s.transfersCache.Create(ctx, transfer); err != nil {
+		logging.Logger.Warnf("error caching transfer %s: %v", id, err)
+	}
 	return id, nil
 }
 
 func (s *TransfersService) GetByID(ctx context.Context, id string) (models.Transfer, error) {
+	// try cache first
+	cachedTransfer, err := s.transfersRepo.GetByID(ctx, id)
+	if err == nil {
+		logging.Logger.Infof("transfer %s obtained from cache", id)
+		return cachedTransfer, nil
+	}
+
 	transfer, err := s.transfersRepo.GetByID(ctx, id)
 	if err != nil {
 		return models.Transfer{}, fmt.Errorf("error getting transfer %s from repository: %w", id, err)
 	}
+
+	// save in cache
+	logging.Logger.Infof("transfer %s obtained from DB", id)
+	if _, err := s.transfersCache.Create(ctx, transfer); err != nil {
+		logging.Logger.Warnf("error caching transfer %s: %v", id, err)
+	}
+
 	return transfer, nil
 }
 
@@ -76,12 +97,20 @@ func (s *TransfersService) Update(ctx context.Context, transfer models.Transfer)
 	if err := s.transfersRepo.Update(ctx, transfer); err != nil {
 		return fmt.Errorf("error updating transfer %s in repository: %w", transfer.ID, err)
 	}
+	// update cache
+	if err := s.transfersCache.Update(ctx, transfer); err != nil {
+		logging.Logger.Warnf("error updating cached transfer %s: %v", transfer.ID, err)
+	}
 	return nil
 }
 
 func (s *TransfersService) Delete(ctx context.Context, id string) error {
 	if err := s.transfersRepo.Delete(ctx, id); err != nil {
 		return fmt.Errorf("error deleting transfer %s from repository: %w", id, err)
+	}
+	// delete from cache
+	if err := s.transfersCache.Delete(ctx, id); err != nil {
+		logging.Logger.Warnf("error deleting cached transfer %s: %v", id, err)
 	}
 	return nil
 }

@@ -9,9 +9,10 @@ import (
 )
 
 type Config struct {
-	Business      BusinessConfig `json:"business"`
-	MongoDBConfig MongoDB        `json:"mongodb"`
-	MySQLConfig   MySQL          `json:"mysql"`
+	Business        BusinessConfig `json:"business"`
+	MongoDBConfig   MongoDB        `json:"mongodb"`
+	MySQLConfig     MySQL          `json:"mysql"`
+	MemcachedConfig Memcached
 }
 
 type BusinessConfig struct {
@@ -36,12 +37,19 @@ type MySQL struct {
 	Database string `env:"MYSQL_DATABASE" envDefault:"transfers-db" json:"database"`
 }
 
+type Memcached struct {
+	Hostname   string `env:"MEMCACHED_HOSTNAME" envDefault:"memcached" json:"hostname"`
+	Port       int    `env:"MEMCACHED_PORT" envDefault:"11211" json:"port"`
+	TTLSeconds int    `env:"MEMCACHED_TTL_SECONDS" envDefault:"30" json:"ttl_seconds"`
+}
+
 func ParseFromEnv() *Config {
 	var cfg Config
 	for _, nested := range []interface{}{
 		&cfg.Business,
 		&cfg.MongoDBConfig,
 		&cfg.MySQLConfig,
+		&cfg.MemcachedConfig,
 	} {
 		if err := env.Parse(nested); err != nil {
 			logging.Logger.Fatalf("error parsing config: %v", err)
