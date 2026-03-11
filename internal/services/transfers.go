@@ -54,31 +54,36 @@ func (s *TransfersService) Create(ctx context.Context, transfer models.Transfer)
 	if err != nil {
 		return "", fmt.Errorf("error creating transfer in repository: %w", err)
 	}
+	logging.Logger.Infof("Transfer created in DB with ID: %s", id)
+	// also create in cache
 	transfer.ID = id
 	if _, err := s.transfersCache.Create(ctx, transfer); err != nil {
-		logging.Logger.Warnf("error caching transfer %s: %v", id, err)
+		logging.Logger.Warnf("error creating transfer in cache: %w", err)
 	}
+	logging.Logger.Infof("Transfer created in cache with ID: %s", id)
 	return id, nil
 }
 
 func (s *TransfersService) GetByID(ctx context.Context, id string) (models.Transfer, error) {
-	// try cache first
-	cachedTransfer, err := s.transfersRepo.GetByID(ctx, id)
+	// first try to get from cache
+	transfer, err := s.transfersCache.GetByID(ctx, id)
 	if err == nil {
-		logging.Logger.Infof("transfer %s obtained from cache", id)
-		return cachedTransfer, nil
+		logging.Logger.Infof("Transfer retrieved from cache with ID: %s", id)
+		return transfer, nil
 	}
 
-	transfer, err := s.transfersRepo.GetByID(ctx, id)
+	// if not found in cache, get from repository
+	transfer, err = s.transfersRepo.GetByID(ctx, id)
 	if err != nil {
 		return models.Transfer{}, fmt.Errorf("error getting transfer %s from repository: %w", id, err)
 	}
+	logging.Logger.Infof("Transfer retrieved from DB with ID: %s", id)
 
-	// save in cache
-	logging.Logger.Infof("transfer %s obtained from DB", id)
+	// also create in cache
 	if _, err := s.transfersCache.Create(ctx, transfer); err != nil {
-		logging.Logger.Warnf("error caching transfer %s: %v", id, err)
+		logging.Logger.Warnf("error creating transfer in cache: %w", err)
 	}
+	logging.Logger.Infof("Transfer created in cache with ID: %s", id)
 
 	return transfer, nil
 }
@@ -97,9 +102,9 @@ func (s *TransfersService) Update(ctx context.Context, transfer models.Transfer)
 	if err := s.transfersRepo.Update(ctx, transfer); err != nil {
 		return fmt.Errorf("error updating transfer %s in repository: %w", transfer.ID, err)
 	}
-	// update cache
-	if err := s.transfersCache.Update(ctx, transfer); err != nil {
-		logging.Logger.Warnf("error updating cached transfer %s: %v", transfer.ID, err)
+	// also create in cache
+	if _, err := s.transfersCache.Create(ctx, transfer); err != nil {
+		logging.Logger.Warnf("error creating transfer in cache: %w", err)
 	}
 	return nil
 }
@@ -108,9 +113,9 @@ func (s *TransfersService) Delete(ctx context.Context, id string) error {
 	if err := s.transfersRepo.Delete(ctx, id); err != nil {
 		return fmt.Errorf("error deleting transfer %s from repository: %w", id, err)
 	}
-	// delete from cache
+	// also delete from cache
 	if err := s.transfersCache.Delete(ctx, id); err != nil {
-		logging.Logger.Warnf("error deleting cached transfer %s: %v", id, err)
+		logging.Logger.Warnf("error deleting transfer %s from cache: %w", id, err)
 	}
 	return nil
 }

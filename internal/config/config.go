@@ -12,7 +12,7 @@ type Config struct {
 	Business        BusinessConfig `json:"business"`
 	MongoDBConfig   MongoDB        `json:"mongodb"`
 	MySQLConfig     MySQL          `json:"mysql"`
-	MemcachedConfig Memcached
+	MemcachedConfig Memcached      `json:"memcached"`
 }
 
 type BusinessConfig struct {
