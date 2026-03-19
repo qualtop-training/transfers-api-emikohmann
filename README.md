@@ -92,7 +92,9 @@ db.transfers.find().pretty()
 db.transfers.count()
 ```
 
-### 5. Test MySQL in Docker
+---
+
+### 6. Test MySQL in Docker
 
 ```bash
 docker exec -it transfers-mysql mysql -u root -p
@@ -111,8 +113,15 @@ CREATE TABLE transfers (
 SELECT * FROM transfers;
 ```
 
-### Test Memcached in Docker
+---
 
+### 7. Test RabbitMQ
+
+1. Go to http://localhost:15672
+2. Select Queues and Streams
+3. Check the events, lags or interact with the messages
+
+---
 
 ## Training Workflow
 
